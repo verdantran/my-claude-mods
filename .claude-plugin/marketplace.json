@@ -1,0 +1,16 @@
+{
+  "name": "my-claude-mods",
+  "owner": {
+    "name": "verdantran"
+  },
+  "metadata": {
+    "description": "Small mods that change Claude Code's interface and behaviour"
+  },
+  "plugins": [
+    {
+      "name": "usage-meter",
+      "source": "./usage-meter",
+      "description": "A slim band above the prompt showing how much of your 5-hour and weekly Claude Code limits you have used"
+    }
+  ]
+}
