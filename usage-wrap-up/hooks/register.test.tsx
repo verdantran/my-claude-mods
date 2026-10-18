@@ -71,10 +71,27 @@ test('a new prompt near the limit carries the instruction', async ($, on) => {
   expect((await callTool($)).context).toBeUndefined()
 })
 
-test('the threshold comes from the options', { options: { threshold: 85 } }, async ($, on) => {
+test('each window has its own threshold', { options: { fiveHourThreshold: 85, weeklyThreshold: 97 } }, async ($, on) => {
   bottom(on)
-  await measure($, [{ kind: 'five_hour', percentUsed: 88 }])
-  expect((await callTool($)).context?.[0]).toMatch(/88%/)
+  await measure($, [{ kind: 'seven_day', percentUsed: 96 }])
+  expect((await callTool($)).context).toBeUndefined()
+
+  await measure($, [
+    { kind: 'seven_day', percentUsed: 96 },
+    { kind: 'five_hour', percentUsed: 88 },
+  ])
+  expect((await callTool($)).context?.[0]).toMatch(/88% of the person's 5-hour limit/)
+})
+
+test('a second window crossing later gets its own note', async ($, on) => {
+  bottom(on)
+  await measure($, [{ kind: 'five_hour', percentUsed: 97 }, { kind: 'seven_day', percentUsed: 60 }])
+  expect((await callTool($)).context).toHaveLength(1)
+
+  await measure($, [{ kind: 'five_hour', percentUsed: 98 }, { kind: 'seven_day', percentUsed: 95 }])
+  const context = (await callTool($)).context
+  expect(context).toHaveLength(1)
+  expect(context?.[0]).toMatch(/weekly limit/)
 })
 
 test('shows a wrap-up row in the band while near the limit, keeping what is beneath', async ($, on) => {

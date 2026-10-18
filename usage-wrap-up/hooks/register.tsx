@@ -21,11 +21,14 @@ const untilReset = (resetsAt: string, at: number) => {
 // A window is identified by when it resets, so a fresh window can warn again
 const windowKey = (limit: Limit) => `${limit.kind}@${limit.resetsAt ?? ''}`
 
-const nearLimit = async ($: EngineInterface, threshold: number, at?: number) => {
+type Thresholds = (kind: string) => number
+
+const nearLimits = async ($: EngineInterface, thresholdFor: Thresholds, at?: number) => {
   at ??= await $.clock.now()
-  const live = (await read($, limits)).filter(l => !l.resetsAt || Date.parse(l.resetsAt) > at)
-  const worst = live.sort((a, b) => b.percentUsed - a.percentUsed)[0]
-  return worst && worst.percentUsed >= threshold ? { limit: worst, at } : undefined
+  const hot = (await read($, limits))
+    .filter(l => (!l.resetsAt || Date.parse(l.resetsAt) > at) && l.percentUsed >= thresholdFor(l.kind))
+    .sort((a, b) => b.percentUsed - a.percentUsed)
+  return { hot, at }
 }
 
 const instruction = (limit: Limit, at: number) => {
@@ -54,7 +57,10 @@ const markWarned = async ($: EngineInterface, limit: Limit) => {
 }
 
 export const register: Register = (on, options) => {
-  const threshold = typeof options.threshold === 'number' ? options.threshold : 95
+  const option = (name: string, fallback: number) => (typeof options[name] === 'number' ? options[name] : fallback)
+  const fiveHour = option('fiveHourThreshold', 95)
+  const weekly = option('weeklyThreshold', 95)
+  const thresholdFor: Thresholds = kind => (kind === 'seven_day' ? weekly : fiveHour)
 
   on('session.start', async ($, e, next) => {
     const result = await next(e)
@@ -76,26 +82,30 @@ export const register: Register = (on, options) => {
   })
 
   on('prompt.submit', async ($, e, next) => {
-    const near = e.command ? undefined : await nearLimit($, threshold)
-    if (!near) return next(e)
-    await markWarned($, near.limit)
-    return next({ ...e, context: [...(e.context ?? []), instruction(near.limit, near.at)] })
+    const { hot, at } = await nearLimits($, thresholdFor)
+    if (e.command || !hot[0]) return next(e)
+    for (const limit of hot) await markWarned($, limit)
+    return next({ ...e, context: [...(e.context ?? []), instruction(hot[0], at)] })
   })
 
   on('tool.call', async ($, e, next) => {
     const result = await next(e)
     if (result.deny !== undefined) return result
-    const near = await nearLimit($, threshold)
-    if (!near || !(await markWarned($, near.limit))) return result
+    const { hot, at } = await nearLimits($, thresholdFor)
+    const fresh: Limit[] = []
+    for (const limit of hot) if (await markWarned($, limit)) fresh.push(limit)
+    if (fresh.length === 0) return result
 
-    $.ui.toast(`${Math.round(near.limit.percentUsed)}% of your ${LABELS[near.limit.kind] ?? near.limit.kind} limit used: asked Claude to wrap up if it can't finish`)
-    return { ...result, context: [...(result.context ?? []), instruction(near.limit, near.at)] }
+    for (const limit of fresh) {
+      $.ui.toast(`${Math.round(limit.percentUsed)}% of your ${LABELS[limit.kind] ?? limit.kind} limit used: asked Claude to wrap up if it can't finish`)
+    }
+    return { ...result, context: [...(result.context ?? []), ...fresh.map(limit => instruction(limit, at))] }
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const below = await next(e)
-    const near = e.props.hasSurvey ? undefined : await nearLimit($, threshold, (await read($, now)) || undefined)
-    if (!near) return below
+    const { hot } = await nearLimits($, thresholdFor, (await read($, now)) || undefined)
+    if (e.props.hasSurvey || hot.length === 0) return below
 
     const { Box, Text } = $.ui.resolve(e)
 
