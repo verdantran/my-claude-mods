@@ -5,6 +5,7 @@ import type { Limit } from '../types'
 
 const limits = atom({ plugin: 'usage-wrap-up', key: 'limits' } as const, [])
 const warned = atom({ plugin: 'usage-wrap-up', key: 'warned' } as const, [])
+const now = atom({ plugin: 'usage-wrap-up', key: 'now' } as const, 0)
 
 const MINUTE = 60_000
 const LABELS: Record<string, string> = { five_hour: '5-hour', seven_day: 'weekly', spend_limit: 'spend' }
@@ -20,8 +21,8 @@ const untilReset = (resetsAt: string, at: number) => {
 // A window is identified by when it resets, so a fresh window can warn again
 const windowKey = (limit: Limit) => `${limit.kind}@${limit.resetsAt ?? ''}`
 
-const nearLimit = async ($: EngineInterface, threshold: number) => {
-  const at = await $.clock.now()
+const nearLimit = async ($: EngineInterface, threshold: number, at?: number) => {
+  at ??= await $.clock.now()
   const live = (await read($, limits)).filter(l => !l.resetsAt || Date.parse(l.resetsAt) > at)
   const worst = live.sort((a, b) => b.percentUsed - a.percentUsed)[0]
   return worst && worst.percentUsed >= threshold ? { limit: worst, at } : undefined
@@ -58,6 +59,14 @@ export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     await remember($, (await $.session.usage()).rateLimits)
+
+    const tick = async () => {
+      const at = await $.clock.now()
+      await update($, now, () => at)
+    }
+    await tick()
+    $.clock.every(MINUTE, () => void tick())
+
     return result
   })
 
@@ -81,5 +90,26 @@ export const register: Register = (on, options) => {
 
     $.ui.toast(`${Math.round(near.limit.percentUsed)}% of your ${LABELS[near.limit.kind] ?? near.limit.kind} limit used: asked Claude to wrap up if it can't finish`)
     return { ...result, context: [...(result.context ?? []), instruction(near.limit, near.at)] }
+  })
+
+  on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+    const below = await next(e)
+    const near = e.props.hasSurvey ? undefined : await nearLimit($, threshold, (await read($, now)) || undefined)
+    if (!near) return below
+
+    const { Box, Text } = $.ui.resolve(e)
+
+    return (
+      <Box flexDirection="column">
+        {below}
+        <Box key="wrap-up">
+          <Text wrap="truncate">
+            <Text dimColor>{'wrap '}</Text>
+            <Text color="error" weight="semibold">{'on'}</Text>
+            <Text dimColor>{" · Claude will stop tidily if it can't finish"}</Text>
+          </Text>
+        </Box>
+      </Box>
+    )
   })
 }

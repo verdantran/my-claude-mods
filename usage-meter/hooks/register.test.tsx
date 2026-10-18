@@ -18,7 +18,7 @@ const bottom = (on: On) => {
   on('session.measure', (_$, e) => ({ changed: e.changed }))
   on('ui.render', ($, e) => {
     const { Box } = $.ui.resolve(e)
-    return <Box />
+    return <Box key="below" />
   })
 }
 
@@ -78,4 +78,18 @@ test('bars take the session colour from /color, and drop it on reset', async ($,
   expect(await barColor()).toBe('purple_FOR_SUBAGENTS_ONLY')
   await $.command.run({ command: 'color', args: 'default' } as never)
   expect(await barColor()).toBe('claude')
+})
+
+test('keeps the band beneath its own bars', async ($, on) => {
+  bottom(on)
+  mock.clock(on)
+  await $.session.measure({
+    context: { window: 200_000 } as never,
+    rateLimits: [{ kind: 'five_hour', percentUsed: 40 }],
+    changed: ['rateLimits'],
+  })
+  const ui = await $.ui.mount({ plugin: 'usage-meter', surface: 'terminal', ...BAND })
+  expect(await ui.find({ key: 'five_hour' })).toBeDefined()
+  expect(await ui.find({ key: 'below' })).toBeDefined()
+  await ui.unmount()
 })

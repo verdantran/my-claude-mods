@@ -114,29 +114,34 @@ export const register: Register = on => {
     const perWindow = isStacked ? columns : Math.floor((columns - 3 * (windows.length - 1)) / windows.length)
     const barWidth = Math.max(6, Math.min(24, perWindow - 28))
 
-    return (
-      <Box flexDirection={isStacked ? 'column' : 'row'} columnGap={3}>
-        {windows.map(limit => {
-          const used = percentUsed(limit, at)
-          const filled = Math.round((used / 100) * barWidth)
-          const reset = untilReset(limit.resetsAt, at)
-          const label = (LABELS[limit.kind] ?? limit.kind).padEnd(5)
+    const below = await next(e)
 
-          return (
-            <Box key={limit.kind}>
-              <Text wrap="truncate">
-                <Text dimColor>{label}</Text>
-                <Text color={tone(used, color)}>{'━'.repeat(filled)}</Text>
-                <Text color="subtle">{'─'.repeat(barWidth - filled)}</Text>
-                <Text color={used < 75 ? 'text' : tone(used, color)} weight="semibold">
-                  {` ${Math.round(used)}%`}
+    return (
+      <Box flexDirection="column">
+        <Box flexDirection={isStacked ? 'column' : 'row'} columnGap={3}>
+          {windows.map(limit => {
+            const used = percentUsed(limit, at)
+            const filled = Math.round((used / 100) * barWidth)
+            const reset = untilReset(limit.resetsAt, at)
+            const label = (LABELS[limit.kind] ?? limit.kind).padEnd(5)
+
+            return (
+              <Box key={limit.kind}>
+                <Text wrap="truncate">
+                  <Text dimColor>{label}</Text>
+                  <Text color={tone(used, color)}>{'━'.repeat(filled)}</Text>
+                  <Text color="subtle">{'─'.repeat(barWidth - filled)}</Text>
+                  <Text color={used < 75 ? 'text' : tone(used, color)} weight="semibold">
+                    {` ${Math.round(used)}%`}
+                  </Text>
+                  <Text dimColor>{' used'}</Text>
+                  {reset && <Text dimColor>{` · resets ${reset}`}</Text>}
                 </Text>
-                <Text dimColor>{' used'}</Text>
-                {reset && <Text dimColor>{` · resets ${reset}`}</Text>}
-              </Text>
-            </Box>
-          )
-        })}
+              </Box>
+            )
+          })}
+        </Box>
+        {below}
       </Box>
     )
   })
