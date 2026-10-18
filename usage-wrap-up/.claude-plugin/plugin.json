@@ -1,0 +1,17 @@
+{
+  "name": "usage-wrap-up",
+  "version": "0.1.0",
+  "description": "Near the end of your 5-hour or weekly limit, asks Claude to wrap up tidily if it can't finish in what's left",
+  "author": {
+    "name": "verdantran"
+  },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "threshold": {
+      "type": "number",
+      "title": "Threshold",
+      "description": "Percent of a usage limit at which Claude is asked to wrap up",
+      "default": 95
+    }
+  }
+}

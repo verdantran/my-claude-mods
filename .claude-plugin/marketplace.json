@@ -11,6 +11,11 @@
       "name": "usage-meter",
       "source": "./usage-meter",
       "description": "A slim band above the prompt showing how much of your 5-hour and weekly Claude Code limits you have used"
+    },
+    {
+      "name": "usage-wrap-up",
+      "source": "./usage-wrap-up",
+      "description": "Near the end of your 5-hour or weekly limit, asks Claude to wrap up tidily if it can't finish in what's left"
     }
   ]
 }
