@@ -1,6 +1,6 @@
 {
   "name": "usage-wrap-up",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Near the end of your 5-hour or weekly limit, asks Claude to wrap up tidily if it can't finish in what's left",
   "author": {
     "name": "verdantran"

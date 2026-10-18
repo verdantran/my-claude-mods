@@ -104,8 +104,8 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const below = await next(e)
+    if (e.props.hasSurvey || (await read($, limits)).length === 0) return below
     const { hot } = await nearLimits($, thresholdFor, (await read($, now)) || undefined)
-    if (e.props.hasSurvey || hot.length === 0) return below
 
     const { Box, Text } = $.ui.resolve(e)
 
@@ -113,11 +113,15 @@ export const register: Register = (on, options) => {
       <Box flexDirection="column">
         {below}
         <Box key="wrap-up">
-          <Text wrap="truncate">
-            <Text dimColor>{'wrap '}</Text>
-            <Text color="error" weight="semibold">{'on'}</Text>
-            <Text dimColor>{" · Claude will stop tidily if it can't finish"}</Text>
-          </Text>
+          {hot.length > 0 ? (
+            <Text wrap="truncate">
+              <Text dimColor>{'wrap '}</Text>
+              <Text color="error" weight="semibold">{'on'}</Text>
+              <Text dimColor>{" · Claude will stop tidily if it can't finish"}</Text>
+            </Text>
+          ) : (
+            <Text wrap="truncate" dimColor>{`wrap at ${fiveHour}% 5h · ${weekly}% week`}</Text>
+          )}
         </Box>
       </Box>
     )

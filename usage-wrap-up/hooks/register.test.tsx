@@ -94,14 +94,14 @@ test('a second window crossing later gets its own note', async ($, on) => {
   expect(context?.[0]).toMatch(/weekly limit/)
 })
 
-test('shows a wrap-up row in the band while near the limit, keeping what is beneath', async ($, on) => {
+test('shows the thresholds in the band, then wrap-up mode near the limit, keeping what is beneath', async ($, on) => {
   const clock = bottom(on)
   const resetsAt = new Date(clock.now() + HOUR).toISOString()
 
   for (const surface of ['terminal', 'desktop'] as const) {
     await measure($, [{ kind: 'five_hour', percentUsed: 50, resetsAt }])
     let ui = await $.ui.mount({ plugin: 'usage-wrap-up', surface, ...BAND })
-    expect(await ui.find({ key: 'wrap-up' })).toBeUndefined()
+    expect((await ui.find({ key: 'wrap-up' }))?.text).toBe('wrap at 95% 5h · 95% week')
     expect(await ui.find({ key: 'below' })).toBeDefined()
     await ui.unmount()
 
@@ -111,4 +111,12 @@ test('shows a wrap-up row in the band while near the limit, keeping what is bene
     expect(await ui.find({ key: 'below' })).toBeDefined()
     await ui.unmount()
   }
+})
+
+test('stays out of the band before any reading', async ($, on) => {
+  bottom(on)
+  const ui = await $.ui.mount({ plugin: 'usage-wrap-up', surface: 'terminal', ...BAND })
+  expect(await ui.find({ key: 'wrap-up' })).toBeUndefined()
+  expect(await ui.find({ key: 'below' })).toBeDefined()
+  await ui.unmount()
 })
